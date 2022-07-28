@@ -13,6 +13,9 @@ import mongoose from "mongoose";
 import MongoStore from "connect-mongo";
 import session from "express-session";
 import { COOKIE_NAME, __prod__ } from "./constants";
+import { Context } from "./types/Context";
+import { PostResolver } from "./resolvers/post";
+import cors from "cors";
 
 const main = async () => {
   await createConnection({
@@ -28,9 +31,19 @@ const main = async () => {
 
   const app = express();
 
+  app.use(
+    cors({
+      origin: "http://localhost:3000/",
+      credentials: true,
+    })
+  );
+
   const mongoUrl = `mongodb+srv://${process.env.SESSION_DB_USERNAME_DEV_PROD}:${process.env.SESSION_DB_PASSWORD_DEV_PROD}@reddit.hasjefv.mongodb.net/?retryWrites=true&w=majority`;
   // session/cookie
-  await mongoose.connect(mongoUrl, {});
+  await mongoose.connect(mongoUrl, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
 
   console.log("MongoDB Connected");
 
@@ -42,7 +55,7 @@ const main = async () => {
         maxAge: 1000 * 60 * 60, // one hour
         httpOnly: true, // JS front end cannot access the cookie
         secure: __prod__, // cookie only works in https
-        sameSite: "none",
+        sameSite: "lax",
       },
       secret: process.env.SESSION_SECRET_DEV_PROD as string,
       saveUninitialized: false, // don't save empty sessions, right from the start
@@ -52,9 +65,10 @@ const main = async () => {
 
   const apolloServer = new ApolloServer({
     schema: await buildSchema({
-      resolvers: [HelloResolver, UserResolver],
+      resolvers: [HelloResolver, UserResolver, PostResolver],
       validate: false,
     }),
+    context: ({ req, res }): Context => ({ req, res }),
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
   });
 
